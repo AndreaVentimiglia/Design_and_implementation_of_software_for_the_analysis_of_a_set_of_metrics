@@ -1,0 +1,13 @@
+prometheus_api_client
+prometheus_client
+confluent_kafka
+pandas
+xlsxwriter
+#json
+flask
+kafka-python
+openpyxl
+statsmodels
+datetime
+
+
