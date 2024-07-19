@@ -1,0 +1,87 @@
+version: '2'
+services:
+  db_manager:
+    build:
+      context: .
+      dockerfile: ./db_manager/Dockerfile
+    command: python ./db_manager/main.py
+    depends_on:
+      - db
+
+  db:
+    image: mysql
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ""  # Password vuota
+    ports:
+      - "3307:3306"
+    restart: always
+
+  etl_data_pipeline:
+    build:
+      context: .
+      dockerfile: ./etl_data_pipeline/Dockerfile
+    command: python ./etl_data_pipeline/main.py
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/etl_data_pipeline
+    depends_on:
+      - db_manager
+
+  data_storage:
+    build:
+      context: .
+      dockerfile: ./data_storage/Dockerfile
+    command: python ./data_storage/main.py
+    ports:
+      - "5001:5000"
+    volumes:
+      - .:/data_storage
+    depends_on:
+      - db_manager
+
+  data_retrieval:
+    build:
+      context: .
+      dockerfile: ./data_retrieval/Dockerfile
+    command: python ./data_retrieval/main.py
+    ports:
+      - "5002:5000"
+    volumes:
+      - .:/data_retrieval
+    depends_on:
+      - db_manager
+
+  sla_manager:
+    build:
+      context: .
+      dockerfile: ./sla_manager/Dockerfile
+    command: python ./sla_manager/main.py
+    ports:
+      - "5003:5000"
+    volumes:
+      - .:/sla_manager
+    depends_on:
+      - db_manager
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CREATE_TOPICS: "prometheusdata:1:1" # topic:partition:replicas
